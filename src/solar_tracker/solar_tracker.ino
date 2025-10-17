@@ -797,3 +797,264 @@ void executeStow() {
   
   serialDebug("STOW position reached");
 }
+
+
+// =============================================================================
+// PHASE 4: MOTOR CONTROL & STATE MACHINE
+// =============================================================================
+
+/**
+ * Move servo motor to specified angle
+ * @param angle - Target angle in degrees (0-180)
+ */
+void moveServo(int angle) {
+  // Constrain angle to servo limits
+  angle = constrainAngle(angle, AZIMUTH_MIN, AZIMUTH_MAX);
+  
+  // Write angle to servo
+  azimuthServo.write(angle);
+  
+  // Allow time for servo to reach position
+  delay(SERVO_SETTLE_TIME);
+  
+  Serial.print("Servo moved to: ");
+  Serial.print(angle);
+  Serial.println("°");
+}
+
+/**
+ * Move stepper motor to specified angle
+ * @param targetAngle - Target elevation angle (0-90 degrees)
+ */
+void moveStepper(int targetAngle) {
+  // Constrain angle to valid range
+  targetAngle = constrainAngle(targetAngle, ELEVATION_MIN, ELEVATION_MAX);
+  
+  // Calculate steps needed
+  int steps = calculateStepperSteps(currentElevation, targetAngle);
+  
+  if (steps == 0) {
+    return;  // Already at target position
+  }
+  
+  // Set direction
+  if (steps > 0) {
+    digitalWrite(DIR_PIN, HIGH);  // Move up
+  } else {
+    digitalWrite(DIR_PIN, LOW);   // Move down
+    steps = -steps;  // Make steps positive for loop
+  }
+  
+  // Step the motor
+  for (int i = 0; i < steps; i++) {
+    digitalWrite(STEP_PIN, HIGH);
+    delayMicroseconds(500);  // Pulse width
+    digitalWrite(STEP_PIN, LOW);
+    delayMicroseconds(500);  // Step delay (controls speed)
+  }
+  
+  Serial.print("Stepper moved to: ");
+  Serial.print(targetAngle);
+  Serial.println("°");
+}
+
+/**
+ * Calculate number of steps needed for stepper motor
+ * @param currentAngle - Current elevation angle
+ * @param targetAngle - Desired elevation angle
+ * @return Number of steps (positive = up, negative = down)
+ */
+int calculateStepperSteps(int currentAngle, int targetAngle) {
+  int angleDifference = targetAngle - currentAngle;
+  
+  // Calculate steps: (angle_difference / 360°) * steps_per_revolution
+  // For 200 steps/rev: 200/360 = 0.555 steps per degree
+  int steps = (angleDifference * TOTAL_STEPS) / 360;
+  
+  return steps;
+}
+
+/**
+ * Constrain angle to specified range
+ */
+int constrainAngle(int angle, int minAngle, int maxAngle) {
+  if (angle < minAngle) return minAngle;
+  if (angle > maxAngle) return maxAngle;
+  return angle;
+}
+
+// =============================================================================
+// STATE MACHINE HANDLERS
+// =============================================================================
+
+/**
+ * Handle INIT state - should not normally be called
+ */
+void handleStateInit() {
+  // This state is only used during setup()
+  // If we're here in the main loop, something went wrong
+  serialDebug("WARNING: In INIT state during main loop");
+  currentState = STATE_SEARCHING;
+}
+
+/**
+ * Handle SEARCHING state - scan for sun
+ */
+void handleStateSearching() {
+  // Check if it's too dark (nighttime)
+  if (avgTotal < DARK_THRESHOLD) {
+    serialDebug("Too dark for tracking - entering STOW mode");
+    currentState = STATE_STOW;
+    executeStow();
+    return;
+  }
+  
+  // If we have sufficient light, start tracking
+  if (avgTotal > DARK_THRESHOLD) {
+    serialDebug("Sun detected - entering TRACKING mode");
+    currentState = STATE_TRACKING;
+    digitalWrite(LED_TRACKING, HIGH);
+    return;
+  }
+  
+  // Perform slow sweep to find sun
+  static unsigned long lastSweepMove = 0;
+  if (millis() - lastSweepMove > 2000) {  // Move every 2 seconds
+    currentAzimuth += 10;
+    if (currentAzimuth > AZIMUTH_MAX) {
+      currentAzimuth = AZIMUTH_MIN;
+    }
+    moveServo(currentAzimuth);
+    lastSweepMove = millis();
+  }
+}
+
+/**
+ * Handle TRACKING state - active sun tracking
+ */
+void handleStateTracking() {
+  // Check if it's too dark
+  if (avgTotal < DARK_THRESHOLD) {
+    serialDebug("Lost sun - entering SEARCHING mode");
+    currentState = STATE_SEARCHING;
+    digitalWrite(LED_TRACKING, LOW);
+    return;
+  }
+  
+  // Calculate tracking errors
+  int errorEW = 0;
+  int errorNS = 0;
+  calculateTrackingError(errorEW, errorNS);
+  
+  // Adjust azimuth based on east-west error
+  if (abs(errorEW) > LDR_THRESHOLD) {
+    adjustAzimuth(errorEW);
+  }
+  
+  // Adjust elevation based on north-south error
+  if (abs(errorNS) > LDR_THRESHOLD) {
+    adjustElevation(errorNS);
+  }
+  
+  // If errors are small, panel is well-aligned
+  if (abs(errorEW) < LDR_THRESHOLD && abs(errorNS) < LDR_THRESHOLD) {
+    // Panel is optimally positioned
+    // Could add efficiency logging here
+  }
+}
+
+
+/**
+ * Handle STOW state - weather protection mode
+ */
+void handleStateStow() {
+  // Keep panel in safe position
+  // Weather check happens in main loop
+  // State will transition back to SEARCHING when weather clears
+  
+  // Ensure we're at stow position
+  if (currentAzimuth != STOW_AZIMUTH || currentElevation != STOW_ELEVATION) {
+    executeStow();
+  }
+  
+  // Keep stow LED on
+  digitalWrite(LED_STOW, HIGH);
+  digitalWrite(LED_TRACKING, LOW);
+}
+
+/**
+ * Handle MANUAL state - user control mode
+ */
+void handleStateManual() {
+  // In manual mode, user can control position via Serial commands
+  // or additional buttons could be added for manual jog
+  
+  // For now, maintain current position
+  // Future enhancement: Add serial commands for manual positioning
+  
+  // Check for serial commands
+  if (Serial.available() > 0) {
+    char cmd = Serial.read();
+    
+    switch (cmd) {
+      case 'w':  // Tilt up
+        if (currentElevation < ELEVATION_MAX) {
+          currentElevation += 5;
+          moveStepper(currentElevation);
+          serialDebug("Manual: Elevation increased");
+        }
+        break;
+        
+      case 's':  // Tilt down
+        if (currentElevation > ELEVATION_MIN) {
+          currentElevation -= 5;
+          moveStepper(currentElevation);
+          serialDebug("Manual: Elevation decreased");
+        }
+        break;
+        
+      case 'a':  // Turn left (west)
+        if (currentAzimuth > AZIMUTH_MIN) {
+          currentAzimuth -= 5;
+          moveServo(currentAzimuth);
+          serialDebug("Manual: Azimuth decreased");
+        }
+        break;
+        
+      case 'd':  // Turn right (east)
+        if (currentAzimuth < AZIMUTH_MAX) {
+          currentAzimuth += 5;
+          moveServo(currentAzimuth);
+          serialDebug("Manual: Azimuth increased");
+        }
+        break;
+        
+      case 'h':  // Return to home
+        serialDebug("Manual: Returning to home position");
+        moveToHomePosition();
+        break;
+    }
+  }
+}
+
+/**
+ * Handle ERROR state - system error
+ */
+void handleStateError() {
+  // Flash error LED
+  static unsigned long lastBlink = 0;
+  if (millis() - lastBlink > 500) {
+    digitalWrite(LED_ERROR, !digitalRead(LED_ERROR));
+    lastBlink = millis();
+  }
+  
+  // Turn off other LEDs
+  digitalWrite(LED_TRACKING, LOW);
+  digitalWrite(LED_STOW, LOW);
+  
+  // Display error on LCD
+  displayError(errorMessage);
+  
+  // Wait for reset button
+  // State will be changed by button handler
+}
