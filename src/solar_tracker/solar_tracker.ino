@@ -637,3 +637,163 @@ void checkButtons() {
   }
   resetButtonLastState = resetButtonState;
 }
+
+
+// =============================================================================
+// PHASE 3: CORE TRACKING ALGORITHM & WEATHER PROTECTION
+// =============================================================================
+
+/**
+ * Calculate tracking errors from LDR readings
+ * @param errorEW - Output: East-West error (positive = east brighter)
+ * @param errorNS - Output: North-South error (positive = north brighter)
+ */
+void calculateTrackingError(int &errorEW, int &errorNS) {
+  // East-West error: positive = turn east, negative = turn west
+  errorEW = avgEast - avgWest;
+  
+  // North-South error: positive = tilt up (north), negative = tilt down (south)
+  errorNS = avgNorth - avgSouth;
+  
+  // Debug output
+  Serial.print("Tracking Error - EW: ");
+  Serial.print(errorEW);
+  Serial.print(" NS: ");
+  Serial.println(errorNS);
+}
+
+/**
+ * Adjust azimuth (horizontal) position based on East-West error
+ * @param error - Tracking error (positive = move east, negative = move west)
+ */
+void adjustAzimuth(int error) {
+  if (abs(error) < LDR_THRESHOLD) {
+    // Error too small, no adjustment needed
+    return;
+  }
+  
+  // Determine direction and calculate new position
+  if (error > 0) {
+    // East is brighter, move east (increase azimuth)
+    targetAzimuth = currentAzimuth + TRACKING_STEP;
+    serialDebug("Adjusting azimuth EAST");
+  } else {
+    // West is brighter, move west (decrease azimuth)
+    targetAzimuth = currentAzimuth - TRACKING_STEP;
+    serialDebug("Adjusting azimuth WEST");
+  }
+  
+  // Constrain to valid range
+  targetAzimuth = constrainAngle(targetAzimuth, AZIMUTH_MIN, AZIMUTH_MAX);
+  
+  // Move servo to new position
+  moveServo(targetAzimuth);
+  currentAzimuth = targetAzimuth;
+}
+
+/**
+ * Adjust elevation (vertical) position based on North-South error
+ * @param error - Tracking error (positive = tilt up, negative = tilt down)
+ */
+void adjustElevation(int error) {
+  if (abs(error) < LDR_THRESHOLD) {
+    // Error too small, no adjustment needed
+    return;
+  }
+  
+  // Determine direction and calculate new position
+  if (error > 0) {
+    // North is brighter, tilt up (increase elevation)
+    targetElevation = currentElevation + TRACKING_STEP;
+    serialDebug("Adjusting elevation UP");
+  } else {
+    // South is brighter, tilt down (decrease elevation)
+    targetElevation = currentElevation - TRACKING_STEP;
+    serialDebug("Adjusting elevation DOWN");
+  }
+  
+  // Constrain to valid range
+  targetElevation = constrainAngle(targetElevation, ELEVATION_MIN, ELEVATION_MAX);
+  
+  // Move stepper to new position
+  moveStepper(targetElevation);
+  currentElevation = targetElevation;
+}
+
+/**
+ * Check weather conditions and trigger stow if necessary
+ * Weather protection is highest priority
+ */
+void checkWeatherConditions() {
+  bool needsStow = false;
+  String stowReason = "";
+  
+  // Check for rain
+  if (isRaining) {
+    needsStow = true;
+    stowReason = "RAIN DETECTED";
+    serialDebug("Weather alert: Rain detected!");
+  }
+  
+  // Check temperature limits
+  if (overTemp) {
+    needsStow = true;
+    if (temperature > TEMP_MAX) {
+      stowReason = "HIGH TEMP";
+      serialDebug("Weather alert: Temperature too high!");
+    } else {
+      stowReason = "LOW TEMP";
+      serialDebug("Weather alert: Temperature too low!");
+    }
+  }
+  
+  // Execute stow if needed
+  if (needsStow && currentState != STATE_STOW) {
+    serialDebug("EMERGENCY STOW INITIATED: " + stowReason);
+    errorMessage = stowReason;
+    previousState = currentState;
+    currentState = STATE_STOW;
+    executeStow();
+  }
+  
+  // Check if weather has cleared
+  if (!needsStow && currentState == STATE_STOW) {
+    // Weather is clear but we're still in stow
+    // Wait a bit before resuming to ensure stability
+    static unsigned long stowClearTime = 0;
+    if (stowClearTime == 0) {
+      stowClearTime = millis();
+    }
+    
+    if (millis() - stowClearTime > 30000) {  // 30 seconds clear weather
+      serialDebug("Weather cleared - resuming tracking");
+      currentState = STATE_SEARCHING;
+      stowClearTime = 0;
+    }
+  } else if (needsStow) {
+    // Reset clear time if weather is still bad
+    static unsigned long stowClearTime = 0;
+    stowClearTime = 0;
+  }
+}
+
+/**
+ * Execute emergency stow procedure
+ * Moves panel to safe horizontal position
+ */
+void executeStow() {
+  serialDebug("Executing STOW procedure...");
+  
+  // Turn on stow LED
+  digitalWrite(LED_STOW, HIGH);
+  digitalWrite(LED_TRACKING, LOW);
+  
+  // Move to stow position (horizontal and facing forward)
+  moveServo(STOW_AZIMUTH);
+  currentAzimuth = STOW_AZIMUTH;
+  
+  moveStepper(STOW_ELEVATION);
+  currentElevation = STOW_ELEVATION;
+  
+  serialDebug("STOW position reached");
+}
