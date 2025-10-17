@@ -527,3 +527,113 @@ void serialDebug(String message) {
 // END OF PHASE 1: PROJECT FOUNDATION
 // Next: Phase 2 - Sensor Reading Functions
 // =============================================================================
+
+
+// =============================================================================
+// PHASE 2: SENSOR READING FUNCTIONS
+// =============================================================================
+
+/**
+ * Read all four LDR sensors and calculate averages
+ * LDR Configuration:
+ *   NE (North-East) - Top-right quadrant
+ *   NW (North-West) - Top-left quadrant  
+ *   SE (South-East) - Bottom-right quadrant
+ *   SW (South-West) - Bottom-left quadrant
+ */
+void readLDRSensors() {
+  // Read raw analog values (0-1023)
+  ldrNE = analogRead(LDR_NE);
+  ldrNW = analogRead(LDR_NW);
+  ldrSE = analogRead(LDR_SE);
+  ldrSW = analogRead(LDR_SW);
+  
+  // Calculate directional averages for tracking decisions
+  avgEast = (ldrNE + ldrSE) / 2;   // Average of east sensors
+  avgWest = (ldrNW + ldrSW) / 2;   // Average of west sensors
+  avgNorth = (ldrNE + ldrNW) / 2;  // Average of north sensors
+  avgSouth = (ldrSE + ldrSW) / 2;  // Average of south sensors
+  
+  // Calculate total average light level
+  avgTotal = (ldrNE + ldrNW + ldrSE + ldrSW) / 4;
+}
+
+/**
+ * Read weather sensors (DHT22 and rain sensor)
+ * Includes error handling for failed sensor reads
+ */
+void readWeatherSensors() {
+  // Read DHT22 temperature and humidity
+  float tempReading = dht.readTemperature();
+  float humidityReading = dht.readHumidity();
+  
+  // Validate DHT22 readings
+  if (!isnan(tempReading) && !isnan(humidityReading)) {
+    temperature = tempReading;
+    humidity = humidityReading;
+  } else {
+    serialDebug("WARNING: DHT22 read failed, using previous values");
+    // Keep previous values, sensor might recover
+  }
+  
+  // Read rain sensor (lower value = more moisture)
+  rainValue = analogRead(RAIN_SENSOR);
+  
+  // Update rain detection flag
+  if (rainValue < RAIN_THRESHOLD) {
+    isRaining = true;
+  } else {
+    isRaining = false;
+  }
+  
+  // Update temperature flag
+  if (temperature > TEMP_MAX || temperature < TEMP_MIN) {
+    overTemp = true;
+  } else {
+    overTemp = false;
+  }
+}
+
+/**
+ * Check button states with debouncing
+ * Buttons use internal pull-up resistors (pressed = LOW)
+ */
+void checkButtons() {
+  // Read current button states (inverted because of pull-up)
+  manualButtonState = !digitalRead(BTN_MANUAL);
+  resetButtonState = !digitalRead(BTN_RESET);
+  
+  // Manual mode toggle button
+  if (manualButtonState && !manualButtonLastState) {
+    // Button was just pressed
+    if (millis() - lastManualPress > DEBOUNCE_DELAY) {
+      // Toggle between MANUAL and previous state
+      if (currentState == STATE_MANUAL) {
+        serialDebug("Manual mode OFF - returning to previous state");
+        currentState = previousState;
+        digitalWrite(LED_TRACKING, HIGH);
+      } else {
+        serialDebug("Manual mode ON");
+        previousState = currentState;
+        currentState = STATE_MANUAL;
+        digitalWrite(LED_TRACKING, LOW);
+      }
+      lastManualPress = millis();
+    }
+  }
+  manualButtonLastState = manualButtonState;
+  
+  // Reset button
+  if (resetButtonState && !resetButtonLastState) {
+    // Button was just pressed
+    if (millis() - lastResetPress > DEBOUNCE_DELAY) {
+      serialDebug("RESET button pressed - returning to SEARCHING state");
+      systemError = false;
+      errorMessage = "";
+      currentState = STATE_SEARCHING;
+      digitalWrite(LED_ERROR, LOW);
+      lastResetPress = millis();
+    }
+  }
+  resetButtonLastState = resetButtonState;
+}
