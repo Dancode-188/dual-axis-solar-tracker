@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "author": "Hilary Audi",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-mega",
+      "id": "mega",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr_ne",
+      "top": -100,
+      "left": -200,
+      "attrs": { "lux": "500" }
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr_nw",
+      "top": -100,
+      "left": -100,
+      "attrs": { "lux": "500" }
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr_se",
+      "top": -100,
+      "left": 0,
+      "attrs": { "lux": "500" }
+    },
+    {
+      "type": "wokwi-photoresistor-sensor",
+      "id": "ldr_sw",
+      "top": -100,
+      "left": 100,
+      "attrs": { "lux": "500" }
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht22",
+      "top": -200,
+      "left": 200,
+      "attrs": { "temperature": "25", "humidity": "50" }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo_azimuth",
+      "top": 200,
+      "left": -150,
+      "attrs": { "horn": "cross" }
+    },
+    {
+      "type": "wokwi-stepper-motor",
+      "id": "stepper_elevation",
+      "top": 200,
+      "left": 50,
+      "attrs": { "size": "17" }
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd",
+      "top": -300,
+      "left": -100,
+      "attrs": { "pins": "i2c" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_manual",
+      "top": 100,
+      "left": -300,
+      "attrs": { "color": "blue", "label": "MANUAL" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_reset",
+      "top": 150,
+      "left": -300,
+      "attrs": { "color": "red", "label": "RESET" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_tracking",
+      "top": 300,
+      "left": -200,
+      "attrs": { "color": "green", "label": "TRACKING" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_stow",
+      "top": 300,
+      "left": -100,
+      "attrs": { "color": "yellow", "label": "STOW" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_error",
+      "top": 300,
+      "left": 0,
+      "attrs": { "color": "red", "label": "ERROR" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_ldr_ne",
+      "top": -80,
+      "left": -200,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_ldr_nw",
+      "top": -80,
+      "left": -100,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_ldr_se",
+      "top": -80,
+      "left": 0,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_ldr_sw",
+      "top": -80,
+      "left": 100,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_led1",
+      "top": 320,
+      "left": -200,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_led2",
+      "top": 320,
+      "left": -100,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_led3",
+      "top": 320,
+      "left": 0,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-a4988",
+      "id": "stepper_driver",
+      "top": 250,
+      "left": 150,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [ "ldr_ne:VCC", "mega:5V", "red", [ "v0" ] ],
+    [ "ldr_ne:GND", "r_ldr_ne:1", "black", [ "v0" ] ],
+    [ "r_ldr_ne:2", "mega:GND", "black", [ "v0" ] ],
+    [ "ldr_ne:AO", "mega:A0", "green", [ "v0" ] ],
+    
+    [ "ldr_nw:VCC", "mega:5V", "red", [ "v0" ] ],
+    [ "ldr_nw:GND", "r_ldr_nw:1", "black", [ "v0" ] ],
+    [ "r_ldr_nw:2", "mega:GND", "black", [ "v0" ] ],
+    [ "ldr_nw:AO", "mega:A1", "green", [ "v0" ] ],
+    
+    [ "ldr_se:VCC", "mega:5V", "red", [ "v0" ] ],
+    [ "ldr_se:GND", "r_ldr_se:1", "black", [ "v0" ] ],
+    [ "r_ldr_se:2", "mega:GND", "black", [ "v0" ] ],
+    [ "ldr_se:AO", "mega:A2", "green", [ "v0" ] ],
+    
+    [ "ldr_sw:VCC", "mega:5V", "red", [ "v0" ] ],
+    [ "ldr_sw:GND", "r_ldr_sw:1", "black", [ "v0" ] ],
+    [ "r_ldr_sw:2", "mega:GND", "black", [ "v0" ] ],
+    [ "ldr_sw:AO", "mega:A3", "green", [ "v0" ] ],
+    
+    [ "dht22:VCC", "mega:5V", "red", [ "v0" ] ],
+    [ "dht22:GND", "mega:GND", "black", [ "v0" ] ],
+    [ "dht22:SDA", "mega:7", "blue", [ "v0" ] ],
+    
+    [ "servo_azimuth:V+", "mega:5V", "red", [ "v0" ] ],
+    [ "servo_azimuth:GND", "mega:GND", "black", [ "v0" ] ],
+    [ "servo_azimuth:PWM", "mega:9", "orange", [ "v0" ] ],
+    
+    [ "lcd:VCC", "mega:5V", "red", [ "v0" ] ],
+    [ "lcd:GND", "mega:GND", "black", [ "v0" ] ],
+    [ "lcd:SDA", "mega:20", "blue", [ "v0" ] ],
+    [ "lcd:SCL", "mega:21", "yellow", [ "v0" ] ],
+    
+    [ "btn_manual:1.l", "mega:2", "blue", [ "v0" ] ],
+    [ "btn_manual:1.r", "mega:GND", "black", [ "v0" ] ],
+    
+    [ "btn_reset:1.l", "mega:8", "red", [ "v0" ] ],
+    [ "btn_reset:1.r", "mega:GND", "black", [ "v0" ] ],
+    
+    [ "led_tracking:A", "mega:13", "green", [ "v0" ] ],
+    [ "led_tracking:C", "r_led1:1", "green", [ "v0" ] ],
+    [ "r_led1:2", "mega:GND", "black", [ "v0" ] ],
+    
+    [ "led_stow:A", "mega:12", "yellow", [ "v0" ] ],
+    [ "led_stow:C", "r_led2:1", "yellow", [ "v0" ] ],
+    [ "r_led2:2", "mega:GND", "black", [ "v0" ] ],
+    
+    [ "led_error:A", "mega:11", "red", [ "v0" ] ],
+    [ "led_error:C", "r_led3:1", "red", [ "v0" ] ],
+    [ "r_led3:2", "mega:GND", "black", [ "v0" ] ],
+    
+    [ "stepper_driver:VDD", "mega:5V", "red", [ "v0" ] ],
+    [ "stepper_driver:GND", "mega:GND", "black", [ "v0" ] ],
+    [ "stepper_driver:STEP", "mega:3", "green", [ "v0" ] ],
+    [ "stepper_driver:DIR", "mega:4", "blue", [ "v0" ] ],
+    [ "stepper_driver:ENABLE", "mega:5", "yellow", [ "v0" ] ],
+    [ "stepper_driver:1A", "stepper_elevation:A+", "purple", [ "v0" ] ],
+    [ "stepper_driver:1B", "stepper_elevation:A-", "gray", [ "v0" ] ],
+    [ "stepper_driver:2A", "stepper_elevation:B+", "brown", [ "v0" ] ],
+    [ "stepper_driver:2B", "stepper_elevation:B-", "white", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
