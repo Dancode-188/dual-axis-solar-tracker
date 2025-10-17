@@ -1,0 +1,69 @@
+# Arduino build files
+*.hex
+*.eep
+*.lss
+*.map
+*.sym
+*.lst
+*.o
+*.d
+*.elf
+*.bin
+
+# Arduino IDE files
+.DS_Store
+*.bak
+*~
+*.swp
+*.swo
+.pio
+.vscode/
+.clang_complete
+.gcc-flags.json
+
+# Build directories
+build/
+.build/
+*.pioenvs
+*.piolibdeps
+
+# Proteus simulation files (large binary files)
+*.workspace
+*.pdsbak
+*.PWI
+LastLoaded*
+
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python (for potential testing scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Editor/IDE specific
+.vscode/
+.idea/
+*.sublime-*
+
+# Documentation temp files
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+temp/
