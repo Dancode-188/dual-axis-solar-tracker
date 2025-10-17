@@ -1058,3 +1058,197 @@ void handleStateError() {
   // Wait for reset button
   // State will be changed by button handler
 }
+
+
+// =============================================================================
+// PHASE 5: USER INTERFACE & DISPLAY
+// =============================================================================
+
+/**
+ * Update LCD display with current system status
+ * Display format:
+ * Line 1: State and position
+ * Line 2: Weather or tracking info
+ */
+void updateLCD() {
+  // Update LCD every second to avoid flicker
+  static unsigned long lastUpdate = 0;
+  if (millis() - lastUpdate < 1000) {
+    return;
+  }
+  lastUpdate = millis();
+  
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  
+  // Display current state and position
+  switch (currentState) {
+    case STATE_INIT:
+      lcd.print("Initializing...");
+      break;
+      
+    case STATE_SEARCHING:
+      lcd.print("SEARCHING");
+      lcd.setCursor(0, 1);
+      lcd.print("Az:");
+      lcd.print(currentAzimuth);
+      lcd.print(" El:");
+      lcd.print(currentElevation);
+      break;
+      
+    case STATE_TRACKING:
+      lcd.print("TRACKING");
+      lcd.setCursor(0, 1);
+      lcd.print("Az:");
+      lcd.print(currentAzimuth);
+      lcd.print(" El:");
+      lcd.print(currentElevation);
+      break;
+      
+    case STATE_STOW:
+      lcd.print("STOW MODE");
+      lcd.setCursor(0, 1);
+      if (isRaining) {
+        lcd.print("Rain detected");
+      } else if (overTemp) {
+        lcd.print("Temp:");
+        lcd.print((int)temperature);
+        lcd.print("C");
+      } else {
+        lcd.print("Weather safe");
+      }
+      break;
+      
+    case STATE_MANUAL:
+      lcd.print("MANUAL MODE");
+      lcd.setCursor(0, 1);
+      lcd.print("Az:");
+      lcd.print(currentAzimuth);
+      lcd.print(" El:");
+      lcd.print(currentElevation);
+      break;
+      
+    case STATE_ERROR:
+      // Error display is handled by displayError() function
+      break;
+  }
+}
+
+/**
+ * Update status LED indicators
+ */
+void updateStatusLEDs() {
+  switch (currentState) {
+    case STATE_TRACKING:
+      digitalWrite(LED_TRACKING, HIGH);
+      digitalWrite(LED_STOW, LOW);
+      digitalWrite(LED_ERROR, LOW);
+      break;
+      
+    case STATE_STOW:
+      digitalWrite(LED_TRACKING, LOW);
+      digitalWrite(LED_STOW, HIGH);
+      digitalWrite(LED_ERROR, LOW);
+      break;
+      
+    case STATE_ERROR:
+      digitalWrite(LED_TRACKING, LOW);
+      digitalWrite(LED_STOW, LOW);
+      // Error LED is flashed in handleStateError()
+      break;
+      
+    case STATE_SEARCHING:
+      digitalWrite(LED_TRACKING, LOW);
+      digitalWrite(LED_STOW, LOW);
+      digitalWrite(LED_ERROR, LOW);
+      break;
+      
+    case STATE_MANUAL:
+      digitalWrite(LED_TRACKING, LOW);
+      digitalWrite(LED_STOW, LOW);
+      digitalWrite(LED_ERROR, LOW);
+      break;
+      
+    default:
+      digitalWrite(LED_TRACKING, LOW);
+      digitalWrite(LED_STOW, LOW);
+      digitalWrite(LED_ERROR, LOW);
+      break;
+  }
+}
+
+/**
+ * Main tracking function (called from TRACKING state)
+ * Integrates all tracking logic
+ */
+void updateTracking() {
+  // This function encapsulates the tracking logic
+  // and is called from handleStateTracking()
+  
+  int errorEW, errorNS;
+  calculateTrackingError(errorEW, errorNS);
+  
+  // Adjust azimuth if needed
+  if (abs(errorEW) > LDR_THRESHOLD) {
+    adjustAzimuth(errorEW);
+  }
+  
+  // Adjust elevation if needed
+  if (abs(errorNS) > LDR_THRESHOLD) {
+    adjustElevation(errorNS);
+  }
+}
+
+// =============================================================================
+// END OF ARDUINO CODE
+// =============================================================================
+
+/*
+ * DEPLOYMENT NOTES:
+ * 
+ * 1. Hardware Setup:
+ *    - Connect all sensors according to pin definitions above
+ *    - Ensure power supply is adequate (12V recommended)
+ *    - Check all connections before powering on
+ * 
+ * 2. Library Requirements:
+ *    - Wire (built-in)
+ *    - LiquidCrystal_I2C (install via Library Manager)
+ *    - Servo (built-in)
+ *    - DHT sensor library by Adafruit (install via Library Manager)
+ *    - Stepper (built-in)
+ * 
+ * 3. Calibration:
+ *    - Adjust LDR_THRESHOLD if tracking is too sensitive/insensitive
+ *    - Adjust DARK_THRESHOLD for nighttime detection
+ *    - Adjust TRACKING_STEP for faster/slower tracking response
+ *    - Adjust RAIN_THRESHOLD based on rain sensor characteristics
+ *    - Verify servo and stepper movement directions
+ * 
+ * 4. Testing:
+ *    - Test manual mode first (press manual button)
+ *    - Use serial monitor for debug output (9600 baud)
+ *    - Verify all LEDs are functioning
+ *    - Test weather protection by covering rain sensor
+ *    - Verify tracking by varying light on LDRs
+ * 
+ * 5. Serial Commands (in MANUAL mode):
+ *    - 'w' = Tilt up (increase elevation)
+ *    - 's' = Tilt down (decrease elevation)
+ *    - 'a' = Turn left/west (decrease azimuth)
+ *    - 'd' = Turn right/east (increase azimuth)
+ *    - 'h' = Return to home position
+ *    - 'd' (in any mode) = Print debug information
+ * 
+ * 6. Troubleshooting:
+ *    - If DHT22 fails, check wiring and 4.7kΩ pull-up resistor
+ *    - If servo jitters, ensure adequate power supply
+ *    - If stepper doesn't move, check A4988 driver connections
+ *    - If LCD doesn't display, verify I2C address (0x27 or 0x3F)
+ *    - If tracking is erratic, check LDR connections and lighting
+ * 
+ * Version: 1.0.0
+ * Last Updated: October 17, 2025
+ * Author: Hilary Audi
+ * License: MIT
+ */
